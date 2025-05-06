@@ -71,62 +71,11 @@ func NewProxy(baseURL string) *Proxy {
 }
 
 func (p *Proxy) HandleGetModelIndex(w http.ResponseWriter, r *http.Request) {
-	// if p.FallbackProxy {
-	// 	resp, err := p.GetModelIndex(r)
-	// 	if err != nil {
-	// 		http.Error(w, fmt.Sprintf("failed to get model index: %v", err), http.StatusServiceUnavailable)
-	// 		return
-	// 	}
-	// 	for key, values := range resp.Header {
-	// 		for _, value := range values {
-	// 			w.Header().Add(key, value)
-	// 		}
-	// 	}
-	// 	defer resp.Body.Close()
-	// 	vars := mux.Vars(r)
-	// 	modelID := vars["model_id"]
-	// 	modelPath := utils.ConvertModelIDToHFPath(modelID)
-	// 	log.Printf("Downloading model index for %s", modelPath)
-	// 	os.MkdirAll(filepath.Join(p.baseDir, "hub", modelPath), 0755)
-	// 	modelIndexPath := filepath.Join(p.baseDir, "hub", modelPath, ".modeindex")
-	// 	file, err := os.Create(modelIndexPath)
-	// 	if err != nil {
-	// 		http.Error(w, fmt.Sprintf("failed to create file: %v", err), http.StatusServiceUnavailable)
-	// 		return
-	// 	}
-	// 	teeReader := io.TeeReader(resp.Body, file)
-	// 	io.Copy(w, teeReader)
-	// 	io.Copy(io.Discard, resp.Body)
-	// 	return
-	// }
 	p.proxy.ServeHTTP(w, r)
-
 }
 
 func (p *Proxy) HandleGetModelFile(w http.ResponseWriter, r *http.Request) {
 	p.proxy.ServeHTTP(w, r)
-	// if p.FallbackProxy {
-	// 	// Create a new Hugging Face client
-	// 	client, err := api.NewApi()
-	// 	if err != nil {
-	// 		http.Error(w, fmt.Sprintf("failed to create Hugging Face client: %v", err), http.StatusServiceUnavailable)
-	// 		return
-	// 	}
-	// 	vars := mux.Vars(r)
-	// 	modelID := vars["model_id"]
-	// 	filename := vars["filename"]
-	// 	// Get the model
-	// 	model := client.Model(modelID)
-	// 	log.Printf("Downloading %s", filename)
-	// 	// Use the Get method which will download the file to the HF_HOME cache directory
-	// 	// and return the path to the cached file
-	// 	_, err = model.Get(filename)
-	// 	if err != nil {
-	// 		http.Error(w, fmt.Sprintf("failed to download %s: %v", filename, err), http.StatusServiceUnavailable)
-	// 		return
-	// 	}
-	// 	return
-	// }
 }
 
 func (p *Proxy) WithFallbackProxy(fallback bool, baseDir string) {
