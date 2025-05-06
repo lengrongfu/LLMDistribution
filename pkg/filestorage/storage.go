@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/lengrongfu/LLMDistribution/pkg/utils"
 )
 
 // Storage represents a file storage system
@@ -65,7 +67,7 @@ func (s *Storage) StoreFile(modelID, filename string, content io.Reader) (string
 
 // GetFile retrieves a file from the file storage
 func (s *Storage) GetFile(modelID, sha, filename string) (io.ReadSeeker, error) {
-	modelPath := convertModelIDToHFPath(modelID)
+	modelPath := utils.ConvertModelIDToHFPath(modelID)
 	// Create the file path
 	filePath := filepath.Join(s.baseDir, modelPath, "snapshots", sha, filename)
 
@@ -85,7 +87,7 @@ func (s *Storage) GetFile(modelID, sha, filename string) (io.ReadSeeker, error) 
 
 // FileExists checks if a file exists in the file storage
 func (s *Storage) FileExists(modelID, sha, filename string) (os.FileInfo, bool) {
-	modelPath := convertModelIDToHFPath(modelID)
+	modelPath := utils.ConvertModelIDToHFPath(modelID)
 	// Create the file path
 	filePath := filepath.Join(s.baseDir, modelPath, "snapshots", sha, filename)
 
@@ -109,7 +111,7 @@ func (s *Storage) DeleteFile(modelID, filename string) error {
 
 // ListFiles lists all files for a model in the file storage
 func (s *Storage) ListFiles(modelID string) ([]string, error) {
-	modePath := convertModelIDToHFPath(modelID)
+	modePath := utils.ConvertModelIDToHFPath(modelID)
 	// Create the model directory path
 	modelDir := filepath.Join(s.baseDir, modePath)
 
@@ -136,7 +138,7 @@ func (s *Storage) ListFiles(modelID string) ([]string, error) {
 }
 
 func (s *Storage) RepoInfo(modelID, version string) (*Model, error) {
-	modePath := convertModelIDToHFPath(modelID)
+	modePath := utils.ConvertModelIDToHFPath(modelID)
 	modelIndexPath := filepath.Join(s.baseDir, modePath, ".modeindex")
 
 	if _, err := os.Stat(modelIndexPath); err != nil {
@@ -164,7 +166,7 @@ func (s *Storage) RepoInfo(modelID, version string) (*Model, error) {
 
 func (s *Storage) buildModelIndex(modelID, version string) (*Model, error) {
 	author := strings.Split(modelID, "/")[0]
-	modePath := convertModelIDToHFPath(modelID)
+	modePath := utils.ConvertModelIDToHFPath(modelID)
 
 	sha, err := s.getRepoSha(modelID, version)
 	if err != nil {
@@ -226,7 +228,7 @@ func (s *Storage) buildModelIndex(modelID, version string) (*Model, error) {
 }
 
 func (s *Storage) getRepoSha(modelID, version string) (string, error) {
-	modePath := convertModelIDToHFPath(modelID)
+	modePath := utils.ConvertModelIDToHFPath(modelID)
 	versionFilePath := filepath.Join(s.baseDir, modePath, "refs", version)
 	if _, err := os.Stat(versionFilePath); err != nil {
 		return "", fmt.Errorf("version file not found: %s", versionFilePath)
@@ -239,7 +241,7 @@ func (s *Storage) getRepoSha(modelID, version string) (string, error) {
 }
 
 func (s *Storage) FileEtag(modelID, sha, filename string) string {
-	modelPath := convertModelIDToHFPath(modelID)
+	modelPath := utils.ConvertModelIDToHFPath(modelID)
 	filePath := filepath.Join(s.baseDir, modelPath, "snapshots", sha, filename)
 	targetPath, err := os.Readlink(filePath)
 	if err != nil {
@@ -248,11 +250,4 @@ func (s *Storage) FileEtag(modelID, sha, filename string) string {
 	absPath, _ := filepath.Abs(targetPath)
 	_, etag := filepath.Split(absPath)
 	return etag
-}
-
-// convertModelIDToHFPath converts a model ID like "Qwen/Qwen2-0.5B-Instruct" to the
-// Hugging Face cache path format like "models--Qwen--Qwen2-0.5B-Instruct"
-func convertModelIDToHFPath(modelID string) string {
-	// Replace slashes with double dashes
-	return "models--" + strings.ReplaceAll(modelID, "/", "--")
 }

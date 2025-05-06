@@ -25,11 +25,16 @@
             }
         },
         {
-            "name": "Launch Package",
+            "name": "Launch main file",
             "type": "go",
             "request": "launch",
-            "mode": "auto",
-            "program": "${fileDirname}"
+            "mode": "debug",
+            "program": "${file}",
+            "env": {
+                "https_proxy": "http://127.0.0.1:7890",
+                "http_proxy": "http://127.0.0.1:7890",
+                "all_proxy": "socks5://127.0.0.1:7891"
+            }
         }
     ]
 }

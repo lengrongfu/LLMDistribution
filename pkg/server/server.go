@@ -16,23 +16,30 @@ import (
 	"github.com/lengrongfu/LLMDistribution/pkg/api"
 	"github.com/lengrongfu/LLMDistribution/pkg/filestorage"
 	"github.com/lengrongfu/LLMDistribution/pkg/git"
+	"github.com/lengrongfu/LLMDistribution/pkg/proxy"
 )
 
 // Server represents the LLM Distribution server
 type Server struct {
-	router       *mux.Router
-	httpServer   *http.Server
-	distribution api.Distribution
-	baseDir      string
+	router        *mux.Router
+	httpServer    *http.Server
+	distribution  api.Distribution
+	proxy         *proxy.Proxy
+	baseDir       string
+	EnableProxy   bool
+	FallbackProxy bool
 }
 
 // Config represents the server configuration
 type Config struct {
-	Host        string
-	Port        int
-	StorageType api.StorageType
-	GitBaseDir  string
-	FileBaseDir string
+	Host          string
+	Port          int
+	StorageType   api.StorageType
+	GitBaseDir    string
+	FileBaseDir   string
+	ProxyBaseURL  string
+	EnableProxy   bool
+	FallbackProxy bool
 }
 
 // NewServer creates a new LLM Distribution server
@@ -62,8 +69,11 @@ func NewServer(config Config) (*Server, error) {
 
 	// Create the server
 	server := &Server{
-		router:  router,
-		baseDir: filepath.Dir(config.GitBaseDir), // Use parent directory as base
+		router:        router,
+		baseDir:       filepath.Dir(config.GitBaseDir), // Use parent directory as base
+		EnableProxy:   config.EnableProxy,
+		FallbackProxy: config.FallbackProxy,
+		proxy:         proxy.NewProxy(config.ProxyBaseURL),
 	}
 	switch config.StorageType {
 	case api.GitStorage:
@@ -72,6 +82,10 @@ func NewServer(config Config) (*Server, error) {
 		server.distribution = fileDist
 	default:
 		return nil, fmt.Errorf("invalid storage type: %d", config.StorageType)
+	}
+	server.proxy.WithFallbackProxy(config.FallbackProxy, config.FileBaseDir)
+	if config.FallbackProxy {
+		server.proxy.WithModifyRequest(server.proxy.WithModifyResponseToCache)
 	}
 
 	// Set up routes
@@ -123,6 +137,19 @@ func (s *Server) handleHealthCheck(w http.ResponseWriter, r *http.Request) {
 // handleGetModelFile handles model file requests
 func (s *Server) handleGetModelFile(w http.ResponseWriter, r *http.Request) {
 	log.Printf("handleGetModelFile called with URL: %s", r.URL.Path)
+
+	if s.EnableProxy {
+		s.proxy.HandleGetModelIndex(w, r)
+		return
+	}
+	var err error
+	if s.FallbackProxy {
+		defer func() {
+			if err != nil {
+				s.proxy.HandleGetModelFile(w, r)
+			}
+		}()
+	}
 	vars := mux.Vars(r)
 	modelID := vars["model_id"]
 	shaOrVersion := vars["sha"]
@@ -133,7 +160,10 @@ func (s *Server) handleGetModelFile(w http.ResponseWriter, r *http.Request) {
 	// 2. 检查文件是否存在
 	fileInfo, exist := s.distribution.FileExists(modelID, sha, filename)
 	if !exist {
-		http.Error(w, "File not found", http.StatusNotFound)
+		err = fmt.Errorf("file not found: %s", filename)
+		if !s.FallbackProxy {
+			http.Error(w, "File not found", http.StatusNotFound)
+		}
 		return
 	}
 	etga := s.distribution.FileEtag(modelID, sha, filename)
@@ -150,11 +180,12 @@ func (s *Server) handleGetModelFile(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "HEAD" {
 		return
 	}
-
 	// 4. 流式传输（核心代码）
 	file, err := s.distribution.GetFile(modelID, sha, filename)
 	if err != nil {
-		http.Error(w, "Failed to get file", http.StatusInternalServerError)
+		if !s.FallbackProxy {
+			http.Error(w, "Failed to get file", http.StatusInternalServerError)
+		}
 		return
 	}
 
@@ -194,6 +225,18 @@ func (s *Server) handleUploadModelFile(w http.ResponseWriter, r *http.Request) {
 // handleGetModelIndex handles model index information requests
 func (s *Server) handleGetModelIndex(w http.ResponseWriter, r *http.Request) {
 	log.Printf("handleGetModelIndex called with URL: %s", r.URL.Path)
+	if s.EnableProxy {
+		s.proxy.HandleGetModelIndex(w, r)
+		return
+	}
+	var err error
+	if s.FallbackProxy {
+		defer func() {
+			if err != nil {
+				s.proxy.HandleGetModelIndex(w, r)
+			}
+		}()
+	}
 	vars := mux.Vars(r)
 	log.Printf("handleGetModelIndex vars: %+v", vars)
 	modelID := vars["model_id"]
@@ -203,7 +246,9 @@ func (s *Server) handleGetModelIndex(w http.ResponseWriter, r *http.Request) {
 	// Create the model index information
 	indexInfo, err := s.distribution.RepoInfo(modelID, version)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to get model index: %v", err), http.StatusInternalServerError)
+		if !s.FallbackProxy {
+			http.Error(w, fmt.Sprintf("Failed to get model index: %v", err), http.StatusInternalServerError)
+		}
 		return
 	}
 

@@ -24,8 +24,11 @@ func main() {
 	host := flag.String("host", "0.0.0.0", "Server host")
 	port := flag.Int("port", 8081, "Server port")
 	gitBaseDir := flag.String("git-base-dir", filepath.Join(homeDir, ".llm-distribution", "git"), "Git base directory")
-	fileBaseDir := flag.String("file-base-dir", "/Users/lengrongfu/.cache/huggingface/", "File base directory")
-	storageType := flag.Int("storage-type", 1, "Storage type (0: Git, 1: File)")
+	fileBaseDir := flag.String("file-base-dir", "/tmp/LLMDistribution", "File base directory")
+	fallbackProxy := flag.Bool("fallback-proxy", true, "Fallback to proxy if file not found")
+	proxyBaseURL := flag.String("proxy-base-url", "https://huggingface.co", "Proxy base URL")
+	enableProxy := flag.Bool("enable-proxy", false, "Enable proxy")
+	storageType := flag.Int("storage-type", 1, "Storage type (0: Git, 1: File, 2: Proxy)")
 	flag.Usage = func() {
 		log.Println("Usage: llmdistribution [options]")
 		flag.PrintDefaults()
@@ -34,11 +37,14 @@ func main() {
 
 	// Create the server configuration
 	config := server.Config{
-		Host:        *host,
-		Port:        *port,
-		StorageType: api.StorageType(*storageType),
-		GitBaseDir:  *gitBaseDir,
-		FileBaseDir: *fileBaseDir,
+		Host:          *host,
+		Port:          *port,
+		StorageType:   api.StorageType(*storageType),
+		GitBaseDir:    *gitBaseDir,
+		FileBaseDir:   *fileBaseDir,
+		ProxyBaseURL:  *proxyBaseURL,
+		EnableProxy:   *enableProxy,
+		FallbackProxy: *fallbackProxy,
 	}
 
 	// Create the server
